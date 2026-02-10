@@ -1,0 +1,47 @@
+// Firebase Firestore Security Rules
+// Copy these rules to Firebase Console → Firestore Database → Rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Notes collection
+    match /notes/{noteId} {
+      // Allow read if authenticated and document belongs to user
+      allow read: if isAuthenticated() 
+                  && isOwner(resource.data.userId);
+      
+      // Allow create if authenticated and setting own userId
+      allow create: if isAuthenticated() 
+                    && isOwner(request.resource.data.userId)
+                    && request.resource.data.keys().hasAll([
+                      'title', 'content', 'userId', 
+                      'createdAt', 'updatedAt'
+                    ]);
+      
+      // Allow update if authenticated and owns the document
+      allow update: if isAuthenticated() 
+                    && isOwner(resource.data.userId)
+                    && request.resource.data.userId == resource.data.userId;
+      
+      // Allow delete if authenticated and owns the document
+      allow delete: if isAuthenticated() 
+                    && isOwner(resource.data.userId);
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
